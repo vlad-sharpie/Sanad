@@ -1,0 +1,8 @@
+{
+  "name": "sanad",
+  "description": "a dns changer tool for gnome extention ",
+  "uuid": "sanad@apps.mirsobhan.ir",
+  "shell-version": [
+    "47"
+  ]
+}
