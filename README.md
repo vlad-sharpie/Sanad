@@ -10,3 +10,5 @@ you can put your custom dns server into `~/.local/share/gnome-shell/extensions/s
 $ echo "xyz,192.168.198.123,192.168.199.124" >> ~/.local/share/gnome-shell/extensions/sanad@apps.mirsobhan.ir/sanad.ns.csv
 ```
 
+![Screenshot From 2025-02-20 23-35-36](https://github.com/user-attachments/assets/b9e1cd75-1406-4d35-9bd8-1ff9892ec39c)
+
