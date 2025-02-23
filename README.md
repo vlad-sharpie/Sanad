@@ -1,10 +1,10 @@
 # SANAD
-The name is a equvelant for dns in persian(سامانه نام دامنه) 
+sanad is a DNS changer extensions for Gnome.
 
-sanad is dns changer extensions for Gnome.
+The name is a equivalent for DNS in persian(سامانه نام دامنه) 
 
 ### How to install
-#### install from gnome extentions
+#### install from gnome extentions site
 - go [here](https://extensions.gnome.org/extension/7861/sanad/) and install it 
 #### install from github
 - download the extension zip file from the last [release](https://github.com/MirS0bhan/sanad/releases) in github
