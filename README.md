@@ -5,9 +5,10 @@ sanad is dns changer extensions for Gnome.
 
 ### How to install
 #### install from gnome extentions
-go [here]([url](https://extensions.gnome.org/extension/7861/sanad/)) and install it 
+- go [here](https://extensions.gnome.org/extension/7861/sanad/) and install it 
 #### install from github
-get the last package from github and then install it with this command: `gnome-extensions install sanad@apps.mirsobhan.ir.shell-extension.zip`
+- download the extension zip file from the last [release]([url](https://github.com/MirS0bhan/sanad/releases)) in github
+- then install it with this command: `gnome-extensions install sanad@apps.mirsobhan.ir.shell-extension.zip`
 
 ### Adding custom name servers
 you can put your custom dns server into `~/.local/share/gnome-shell/extensions/sanad@apps.mirsobhan.ir/sanad.ns.csv` by adding it in csv format like : `Provider,DNS1,DNS2`
