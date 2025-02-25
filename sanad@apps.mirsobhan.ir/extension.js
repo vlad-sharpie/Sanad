@@ -79,20 +79,45 @@ class Indicator extends PanelMenu.Button {
     
     _loadDNSPresets() {
     try {
-        // Get extension directory
-        let extensionDir = this._metadata.dir.get_path();
-        console.log(extensionDir)
-        let csvFile = Gio.File.new_for_path(
-            GLib.build_filenamev([extensionDir, 'sanad.ns.csv'])
-        );
+        // Get user's config directory and extension directory
+        let userConfigDir = GLib.get_user_config_dir();
+        let extensionDir = this._metadata.path; // Get extension directory from metadata
 
-        if (!csvFile.query_exists(null)) {
-            Main.notifyError(_('DNS preset file not found'));
-            logError(new Error('sanad.ns.csv not found'));
+        // Define paths
+        let userCsvPath = GLib.build_filenamev([userConfigDir, 'sanad@apps.mirsobhan.ir', 'sanad.ns.csv']);
+        let defaultCsvPath = GLib.build_filenamev([extensionDir, 'sanad.ns.csv']);
+
+        let userCsvFile = Gio.File.new_for_path(userCsvPath);
+        let defaultCsvFile = Gio.File.new_for_path(defaultCsvPath);
+
+        // Check if default file exists in extension directory
+        if (!defaultCsvFile.query_exists(null)) {
+            Main.notifyError(_('Default DNS preset file not found in extension directory'));
+            logError(new Error('Default sanad.ns.csv not found in extension directory'));
             return {};
         }
-        // Read CSV file
-        let [success, contents] = csvFile.load_contents(null);
+
+        // If user config file doesn't exist, copy from extension directory
+        if (!userCsvFile.query_exists(null)) {
+            try {
+                // Create parent directory if it doesn't exist
+                let parentDir = userCsvFile.get_parent();
+                if (!parentDir.query_exists(null)) {
+                    parentDir.make_directory_with_parents(null);
+                }
+
+                // Copy the default file to user config directory
+                defaultCsvFile.copy(userCsvFile, Gio.FileCopyFlags.NONE, null, null);
+                log('Copied default DNS preset file to user config directory');
+            } catch (copyError) {
+                Main.notifyError(_('Failed to copy default DNS preset file'));
+                logError(copyError);
+                return {};
+            }
+        }
+
+        // Read CSV file (now guaranteed to exist in user config directory)
+        let [success, contents] = userCsvFile.load_contents(null);
         if (!success) {
             Main.notifyError(_('Failed to read DNS preset file'));
             logError(new Error('Failed to read sanad.ns.csv'));
@@ -129,7 +154,7 @@ class Indicator extends PanelMenu.Button {
 
         return dnsPresets;
     } catch (e) {
-        Main.notifyError(_('Error loading DNS presets'+e));
+        Main.notifyError(_('Error loading DNS presets: ' + e.message));
         logError(e);
         return {};
     }
