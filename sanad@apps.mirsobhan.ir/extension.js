@@ -1,260 +1,321 @@
-import GObject from 'gi://GObject';
-import St from 'gi://St';
-import Gio from 'gi://Gio';
-import GLib from 'gi://GLib';
+import GObject from "gi://GObject";
+import Clutter from "gi://Clutter";
+import St from "gi://St";
+import Gio from "gi://Gio";
+import GLib from "gi://GLib";
 
-import {Extension, gettext as _} from 'resource:///org/gnome/shell/extensions/extension.js';
-import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
-import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
-import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import {
+	Extension,
+	gettext as _,
+} from "resource:///org/gnome/shell/extensions/extension.js";
+import * as PanelMenu from "resource:///org/gnome/shell/ui/panelMenu.js";
+import * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
+import * as Main from "resource:///org/gnome/shell/ui/main.js";
 
 const Indicator = GObject.registerClass(
-class Indicator extends PanelMenu.Button {
-    _init(metadata) {
-        super._init(0.0, _('DNS Changer'));
-        this._metadata = metadata
+	class Indicator extends PanelMenu.Button {
+		_init(metadata) {
+			super._init(0.0, _("DNS Changer"));
+			this._metadata = metadata;
 
-        // Create icon
-        this._icon = new St.Icon({
-            icon_name: 'network-workgroup-symbolic',
-            style_class: 'system-status-icon',
-        });
-        this.add_child(this._icon);
+			// Create icon
+			this._icon = new St.Icon({
+				icon_name: "network-workgroup-symbolic",
+				style_class: "system-status-icon",
+			});
+			this.add_child(this._icon);
+			// Horizontal container for label + button
+			let dnsRow = new St.BoxLayout({
+				vertical: false,
+				x_expand: true,
+				style_class: "dns-row",
+			});
 
-        // Current DNS label
-        this._currentDNSLabel = new PopupMenu.PopupMenuItem(
-            _('Current DNS: Loading...'),
-            { reactive: false }
-        );
-        this.menu.addMenuItem(this._currentDNSLabel);
+			// Label
+			this._currentDNSLabel = new St.Label({
+				text: _("Current DNS: Loading..."),
+				y_align: Clutter.ActorAlign.CENTER,
+				x_expand: true,
+			});
+			dnsRow.add_child(this._currentDNSLabel);
 
-        // Add separator
-        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+			// Edit button with icon
+			let editIcon = new St.Icon({
+				icon_name: "document-edit-symbolic",
+				style_class: "popup-menu-icon",
+			});
 
-        // DNS preset menu items
-        this._presetItems = {};
-        this.DNS_PRESETS = this._loadDNSPresets()
-        Object.keys(this.DNS_PRESETS).forEach(provider => {
-            let item = new PopupMenu.PopupMenuItem(_(provider));
-            item.connect('activate', () => this._changeDNS(provider));
-            this._presetItems[provider] = item;
-            this.menu.addMenuItem(item);
-        });
+			let editButton = new St.Button({
+				style_class: "system-menu-action",
+				child: editIcon,
+			});
+			editButton.connect("clicked", () => {
+				let [success, stdout] = this._executeCommand(
+					"gnome-text-editor ~/.config/sanad@apps.mirsobhan.ir/sanad.ns.csv"
+				);
 
-        // Add separator
-        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+				log("Change DNS clicked");
+			});
+			dnsRow.add_child(editButton);
 
-        // Refresh current DNS on menu open
-        this.menu.connect('open-state-changed', (menu, isOpen) => {
-            if (isOpen) this._updateCurrentDNS();
-        });
+			let containerItem = new PopupMenu.PopupBaseMenuItem({ reactive: false });
+			containerItem.actor.add_child(dnsRow);
+			this.menu.addMenuItem(containerItem);
 
-        // Initial DNS check
-        this._updateCurrentDNS();
-    }
+			// Add separator
+			this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-    async _updateCurrentDNS() {
-        try {
-            // Get current DNS using nmcli or resolvectl
-            let [success, stdout] = await this._executeCommand(
-                'nmcli -t -f IP4.DNS dev show 2>/dev/null || resolvectl status 2>/dev/null'
-            );
+			// DNS preset menu items
+			this._presetItems = {};
+			this.DNS_PRESETS = this._loadDNSPresets();
+			Object.keys(this.DNS_PRESETS).forEach((provider) => {
+				let item = new PopupMenu.PopupMenuItem(_(provider));
+				item.connect("activate", () => this._changeDNS(provider));
+				this._presetItems[provider] = item;
+				this.menu.addMenuItem(item);
+			});
 
-            if (success) {
-                let currentDNS = this._parseDNSOutput(stdout.toString());
-                this._currentDNSLabel.label.text = _('Current DNS: ') + 
-                    (currentDNS.length > 0 ? currentDNS.join(', ') : _('System Default'));
+			// Add separator
+			this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-                // Update active preset indicator
-                this._updateActivePreset(currentDNS);
-            } else {
-                this._currentDNSLabel.label.text = _('Current DNS: Error');
-            }
-        } catch (e) {
-            this._currentDNSLabel.label.text = _('Current DNS: Error');
-            Main.notifyError(_('Failed to get current DNS'));
-            logError(e);
-        }
-    }
-    
-    _loadDNSPresets() {
-    try {
-        // Get user's config directory and extension directory
-        let userConfigDir = GLib.get_user_config_dir();
-        let extensionDir = this._metadata.path; // Get extension directory from metadata
+			// Refresh current DNS on menu open
+			this.menu.connect("open-state-changed", (menu, isOpen) => {
+				if (isOpen) this._updateCurrentDNS();
+			});
 
-        // Define paths
-        let userCsvPath = GLib.build_filenamev([userConfigDir, 'sanad@apps.mirsobhan.ir', 'sanad.ns.csv']);
-        let defaultCsvPath = GLib.build_filenamev([extensionDir, 'sanad.ns.csv']);
+			// Initial DNS check
+			this._updateCurrentDNS();
+		}
 
-        let userCsvFile = Gio.File.new_for_path(userCsvPath);
-        let defaultCsvFile = Gio.File.new_for_path(defaultCsvPath);
+		async _updateCurrentDNS() {
+			try {
+				// Get current DNS using nmcli or resolvectl
+				let [success, stdout] = await this._executeCommand(
+					"nmcli -t -f IP4.DNS dev show 2>/dev/null || resolvectl status 2>/dev/null"
+				);
 
-        // Check if default file exists in extension directory
-        if (!defaultCsvFile.query_exists(null)) {
-            Main.notifyError(_('Default DNS preset file not found in extension directory'));
-            logError(new Error('Default sanad.ns.csv not found in extension directory'));
-            return {};
-        }
+				if (success) {
+					let currentDNS = this._parseDNSOutput(stdout.toString());
+					this._currentDNSLabel.set_text(
+						_("Current DNS: ") +
+							(currentDNS.length > 0
+								? currentDNS.join(", ")
+								: _("System Default"))
+					);
 
-        // If user config file doesn't exist, copy from extension directory
-        if (!userCsvFile.query_exists(null)) {
-            try {
-                // Create parent directory if it doesn't exist
-                let parentDir = userCsvFile.get_parent();
-                if (!parentDir.query_exists(null)) {
-                    parentDir.make_directory_with_parents(null);
-                }
+					// Update active preset indicator
+					this._updateActivePreset(currentDNS);
+				} else {
+					this._currentDNSLabel.set_text(_("Current DNS: Error"));
+				}
+			} catch (e) {
+				this._currentDNSLabel.set_text(_("Current DNS: Error"));
+				Main.notifyError(_("Failed to get current DNS"));
+				logError(e);
+			}
+		}
 
-                // Copy the default file to user config directory
-                defaultCsvFile.copy(userCsvFile, Gio.FileCopyFlags.NONE, null, null);
-                log('Copied default DNS preset file to user config directory');
-            } catch (copyError) {
-                Main.notifyError(_('Failed to copy default DNS preset file'));
-                logError(copyError);
-                return {};
-            }
-        }
+		_loadDNSPresets() {
+			try {
+				// Get user's config directory and extension directory
+				let userConfigDir = GLib.get_user_config_dir();
+				let extensionDir = this._metadata.path; // Get extension directory from metadata
 
-        // Read CSV file (now guaranteed to exist in user config directory)
-        let [success, contents] = userCsvFile.load_contents(null);
-        if (!success) {
-            Main.notifyError(_('Failed to read DNS preset file'));
-            logError(new Error('Failed to read sanad.ns.csv'));
-            return {};
-        }
+				// Define paths
+				let userCsvPath = GLib.build_filenamev([
+					userConfigDir,
+					"sanad@apps.mirsobhan.ir",
+					"sanad.ns.csv",
+				]);
+				let defaultCsvPath = GLib.build_filenamev([
+					extensionDir,
+					"sanad.ns.csv",
+				]);
 
-        // Parse CSV
-        let dnsPresets = {};
-        // Use TextDecoder to properly decode the byte array
-        let decoder = new TextDecoder('utf-8');
-        let contentString = decoder.decode(contents);
-        let lines = contentString.trim().split('\n');
-        
-        // Read all lines and append to DNS_PRESETS
-        lines.slice(1).forEach(line => {
-            if (line.trim()) {
-                let [provider, dns1, dns2] = line.split(',').map(item => item.trim());
-                let dnsServers = [];
-                if (dns1) dnsServers.push(dns1);
-                if (dns2) dnsServers.push(dns2);
-                
-                // Validate DNS addresses (except for System preset)
-                if (provider !== 'System') {
-                    dnsServers = dnsServers.filter(dns => this._isValidIP(dns));
-                }
-                dnsPresets[provider] = dnsServers;
-            }
-        });
+				let userCsvFile = Gio.File.new_for_path(userCsvPath);
+				let defaultCsvFile = Gio.File.new_for_path(defaultCsvPath);
 
-        if (Object.keys(dnsPresets).length === 0) {
-            Main.notifyError(_('No valid DNS presets found in file'));
-            logError(new Error('Empty or invalid sanad.ns.csv'));
-        }
+				// Check if default file exists in extension directory
+				if (!defaultCsvFile.query_exists(null)) {
+					Main.notifyError(
+						_("Default DNS preset file not found in extension directory")
+					);
+					logError(
+						new Error("Default sanad.ns.csv not found in extension directory")
+					);
+					return {};
+				}
 
-        return dnsPresets;
-    } catch (e) {
-        Main.notifyError(_('Error loading DNS presets: ' + e.message));
-        logError(e);
-        return {};
-    }
-}
+				// If user config file doesn't exist, copy from extension directory
+				if (!userCsvFile.query_exists(null)) {
+					try {
+						// Create parent directory if it doesn't exist
+						let parentDir = userCsvFile.get_parent();
+						if (!parentDir.query_exists(null)) {
+							parentDir.make_directory_with_parents(null);
+						}
 
-    _parseDNSOutput(output) {
-        // Parse DNS from nmcli or resolvectl output
-        let dnsList = [];
-        output.split('\n').forEach(line => {
-            if (line.includes('DNS') && line.includes(':')) {
-                let dns = line.split(':')[1]?.trim();
-                if (dns && this._isValidIP(dns)) dnsList.push(dns);
-            }
-        });
-        return dnsList;
-    }
+						// Copy the default file to user config directory
+						defaultCsvFile.copy(
+							userCsvFile,
+							Gio.FileCopyFlags.NONE,
+							null,
+							null
+						);
+						log("Copied default DNS preset file to user config directory");
+					} catch (copyError) {
+						Main.notifyError(_("Failed to copy default DNS preset file"));
+						logError(copyError);
+						return {};
+					}
+				}
 
-    async _changeDNS(provider) {
-        try {
-            let dnsServers = this.DNS_PRESETS[provider];
-            
-            // Use nmcli to set DNS (requires NetworkManager)
-            let command = provider === 'System' 
-                ? 'nmcli con mod "$(nmcli -t -f NAME con show --active | head -n1)" ipv4.dns "" && nmcli con up "$(nmcli -t -f NAME con show --active | head -n1)"'
-                : `nmcli con mod "$(nmcli -t -f NAME con show --active | head -n1)" ipv4.dns "${dnsServers.join(' ')}" && nmcli con up "$(nmcli -t -f NAME con show --active | head -n1)"`;
+				// Read CSV file (now guaranteed to exist in user config directory)
+				let [success, contents] = userCsvFile.load_contents(null);
+				if (!success) {
+					Main.notifyError(_("Failed to read DNS preset file"));
+					logError(new Error("Failed to read sanad.ns.csv"));
+					return {};
+				}
 
-            let [success] = await this._executeCommand(command);
+				// Parse CSV
+				let dnsPresets = {};
+				// Use TextDecoder to properly decode the byte array
+				let decoder = new TextDecoder("utf-8");
+				let contentString = decoder.decode(contents);
+				let lines = contentString.trim().split("\n");
 
-            if (success) {
-                Main.notify(_('DNS changed to ') + provider);
-                this._updateCurrentDNS();
-            } else {
-                throw new Error('Command execution failed');
-            }
-        } catch (e) {
-            Main.notifyError(_('Failed to change DNS'));
-            logError(e);
-        }
-    }
+				// Read all lines and append to DNS_PRESETS
+				lines.slice(1).forEach((line) => {
+					if (line.trim()) {
+						let [provider, dns1, dns2] = line
+							.split(",")
+							.map((item) => item.trim());
+						let dnsServers = [];
+						if (dns1) dnsServers.push(dns1);
+						if (dns2) dnsServers.push(dns2);
 
-    _showCustomDNSDialog() {
-        // Implement custom DNS dialog using St.Entry and a dialog
-        // This is a placeholder for the actual implementation
-        Main.notify(_('Custom DNS dialog not implemented yet'));
-    }
+						// Validate DNS addresses (except for System preset)
+						if (provider !== "System") {
+							dnsServers = dnsServers.filter((dns) => this._isValidIP(dns));
+						}
+						dnsPresets[provider] = dnsServers;
+					}
+				});
 
-    _updateActivePreset(currentDNS) {
-        Object.keys(this._presetItems).forEach(provider => {
-            let item = this._presetItems[provider];
-            let presetDNS = this.DNS_PRESETS[provider];
-            
-            // Check if current DNS matches preset
-            let isActive = presetDNS.length === currentDNS.length &&
-                presetDNS.every(dns => currentDNS.includes(dns));
-            
-            item.setOrnament(isActive ? 
-                PopupMenu.Ornament.DOT : 
-                PopupMenu.Ornament.NONE
-            );
-        });
-    }
+				if (Object.keys(dnsPresets).length === 0) {
+					Main.notifyError(_("No valid DNS presets found in file"));
+					logError(new Error("Empty or invalid sanad.ns.csv"));
+				}
 
-    _isValidIP(ip) {
-        const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
-        return ipRegex.test(ip) && ip.split('.').every(num => 
-            parseInt(num) >= 0 && parseInt(num) <= 255
-        );
-    }
+				return dnsPresets;
+			} catch (e) {
+				Main.notifyError(_("Error loading DNS presets: " + e.message));
+				logError(e);
+				return {};
+			}
+		}
 
-    async _executeCommand(command) {
-        try {
-            let proc = Gio.Subprocess.new(
-                ['/bin/sh', '-c', command],
-                Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE
-            );
+		_parseDNSOutput(output) {
+			// Parse DNS from nmcli or resolvectl output
+			let dnsList = [];
+			output.split("\n").forEach((line) => {
+				if (line.includes("DNS") && line.includes(":")) {
+					let dns = line.split(":")[1]?.trim();
+					if (dns && this._isValidIP(dns)) dnsList.push(dns);
+				}
+			});
+			return dnsList;
+		}
 
-            return new Promise((resolve, reject) => {
-                proc.communicate_utf8_async(null, null, (proc, res) => {
-                    try {
-                        let [, stdout, stderr] = proc.communicate_utf8_finish(res);
-                        resolve([proc.get_successful(), stdout, stderr]);
-                    } catch (e) {
-                        reject(e);
-                    }
-                });
-            });
-        } catch (e) {
-            return [false, '', e.toString()];
-        }
-    }
-});
+		async _changeDNS(provider) {
+			try {
+				let dnsServers = this.DNS_PRESETS[provider];
+
+				// Use nmcli to set DNS (requires NetworkManager)
+				let command =
+					provider === "System"
+						? 'nmcli con mod "$(nmcli -t -f NAME con show --active | head -n1)" ipv4.dns "" && nmcli con up "$(nmcli -t -f NAME con show --active | head -n1)"'
+						: `nmcli con mod "$(nmcli -t -f NAME con show --active | head -n1)" ipv4.dns "${dnsServers.join(
+								" "
+						  )}" && nmcli con up "$(nmcli -t -f NAME con show --active | head -n1)"`;
+
+				let [success] = await this._executeCommand(command);
+
+				if (success) {
+					Main.notify(_("DNS changed to ") + provider);
+					this._updateCurrentDNS();
+				} else {
+					throw new Error("Command execution failed");
+				}
+			} catch (e) {
+				Main.notifyError(_("Failed to change DNS"));
+				logError(e);
+			}
+		}
+
+		_showCustomDNSDialog() {
+			// Implement custom DNS dialog using St.Entry and a dialog
+			// This is a placeholder for the actual implementation
+			Main.notify(_("Custom DNS dialog not implemented yet"));
+		}
+
+		_updateActivePreset(currentDNS) {
+			Object.keys(this._presetItems).forEach((provider) => {
+				let item = this._presetItems[provider];
+				let presetDNS = this.DNS_PRESETS[provider];
+
+				// Check if current DNS matches preset
+				let isActive =
+					presetDNS.length === currentDNS.length &&
+					presetDNS.every((dns) => currentDNS.includes(dns));
+
+				item.setOrnament(
+					isActive ? PopupMenu.Ornament.DOT : PopupMenu.Ornament.NONE
+				);
+			});
+		}
+
+		_isValidIP(ip) {
+			const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
+			return (
+				ipRegex.test(ip) &&
+				ip.split(".").every((num) => parseInt(num) >= 0 && parseInt(num) <= 255)
+			);
+		}
+
+		async _executeCommand(command) {
+			try {
+				let proc = Gio.Subprocess.new(
+					["/bin/sh", "-c", command],
+					Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE
+				);
+
+				return new Promise((resolve, reject) => {
+					proc.communicate_utf8_async(null, null, (proc, res) => {
+						try {
+							let [, stdout, stderr] = proc.communicate_utf8_finish(res);
+							resolve([proc.get_successful(), stdout, stderr]);
+						} catch (e) {
+							reject(e);
+						}
+					});
+				});
+			} catch (e) {
+				return [false, "", e.toString()];
+			}
+		}
+	}
+);
 
 export default class DNSChangerExtension extends Extension {
-    enable() {
-        this._indicator = new Indicator(this.metadata);
-        Main.panel.addToStatusArea(this.uuid, this._indicator);
-    }
+	enable() {
+		this._indicator = new Indicator(this.metadata);
+		Main.panel.addToStatusArea(this.uuid, this._indicator);
+	}
 
-    disable() {
-        this._indicator.destroy();
-        this._indicator = null;
-    }
+	disable() {
+		this._indicator.destroy();
+		this._indicator = null;
+	}
 }
