@@ -1,5 +1,20 @@
-zip:
-	cd sanad@apps.mirsobhan.ir && zip -r ../sanad@apps.mirsobhan.ir.zip ./*
+EXTENSION = sanad@apps.mirsobhan.ir
+
+.PHONY: pack format clean lint validate build
+
+pack:
+	cd $(EXTENSION) && zip -r ../$(EXTENSION).zip ./*
 
 format:
-	prettier --write sanad@apps.mirsobhan.ir/extension.js --use-tabs
+	prettier --write $(EXTENSION)/extension.js --use-tabs
+
+lint:
+	prettier --check $(EXTENSION)/extension.js
+
+validate:
+	test -f $(EXTENSION)/extension.js || (echo "Missing extension.js!" && exit 1)
+
+clean:
+	rm -f $(EXTENSION).zip
+
+build: validate format pack
