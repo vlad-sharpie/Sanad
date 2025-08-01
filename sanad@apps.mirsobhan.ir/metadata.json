@@ -3,8 +3,8 @@
   "description": "a dns changer tool for gnome extention ",
   "uuid": "sanad@apps.mirsobhan.ir",
   "shell-version": [
-    "47","48"
+    "47","48","49"
   ],
   "url":"https://github.com/MirS0bhan/sanad",
-  "version-name": "2.3"
+  "version-name": "2.4"
 }
