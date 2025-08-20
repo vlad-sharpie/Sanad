@@ -1,6 +1,14 @@
-# SANAD
-Sanad is a DNS changer extension for Gnome.
+[persian-gnome-badge]: https://gnome-fa.github.io/assets/badges/persian-gnome.svg
+[persian-gnome-url]: https://gnome_fa.t.me/
 
+<div align="center">
+ <img width="1600" height="900" alt="image" src="https://github.com/user-attachments/assets/271aed74-300f-41b5-aeb1-9d1fbfd13269" />
+  # SANAD
+
+Sanad is a DNS changer extension for Gnome.
+  
+[![Persian GNOME][persian-gnome-badge]][persian-gnome-url]    
+</div>
 The name is a equivalent for DNS in persian(سامانه نام دامنه) 
 
 ### How to install
@@ -30,6 +38,4 @@ $ echo "xyz,192.168.198.123,192.168.199.124" >> ~/.config/sanad@apps.mirsobhan.i
 ```bash
 curl -s https://raw.githubusercontent.com/MirS0bhan/sanad/refs/heads/master/dns.csv >> ~/.config/sanad@apps.mirsobhan.ir/sanad.ns.csv
 ```
-
-![Screenshot From 2025-02-20 23-35-36](https://github.com/user-attachments/assets/b9e1cd75-1406-4d35-9bd8-1ff9892ec39c)
 
