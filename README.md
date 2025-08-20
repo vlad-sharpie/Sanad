@@ -3,6 +3,7 @@
 
 <div align="center">
  <img width="1600" height="900" alt="image" src="https://github.com/user-attachments/assets/271aed74-300f-41b5-aeb1-9d1fbfd13269" />
+ 
   # SANAD
 
 Sanad is a DNS changer extension for Gnome.
